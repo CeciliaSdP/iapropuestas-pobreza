@@ -1,11 +1,11 @@
 # Importaciones necesarias
+import streamlit as st
 from bs4 import BeautifulSoup
 import requests
 from datetime import datetime
 import time
 from tenacity import retry, stop_after_attempt, wait_exponential
 import logging
-import streamlit as st
 import pandas as pd
 import plotly.express as px
 import io
@@ -75,41 +75,52 @@ def match_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df2
 
 def validate_dataframe(df: pd.DataFrame) -> tuple[bool, list]:
-    msgs = []
-    ok = True
-    for c in REQUIRED_COLS:
-        if c not in df.columns:
-            ok = False
-            msgs.append(f"Falta la columna obligatoria: '{c}'")
-    # Tipos básicos
-    if ok:
-        # Coerce year to int
-        try:
-            df['year'] = pd.to_numeric(df['year'], errors='coerce').astype('Int64')
-        except Exception:
-            ok = False
-            msgs.append("La columna 'year' debe ser numérica (2019–2023).")
-        # Coerce numeric cols
-        for c in ["nvpov","vpov","pov","epov"]:
+    """Valida el DataFrame y retorna si es válido y mensajes de error."""
+    try:
+        msgs = []
+        ok = True
+        for c in REQUIRED_COLS:
+            if c not in df.columns:
+                ok = False
+                msgs.append(f"Falta la columna obligatoria: '{c}'")
+        
+        if ok:
+            # Coerce year to int
             try:
-                df[c] = pd.to_numeric(df[c], errors='coerce')
+                df['year'] = pd.to_numeric(df['year'], errors='coerce').astype('Int64')
             except Exception:
                 ok = False
-                msgs.append(f"La columna '{c}' debe ser numérica (conteo de personas).")
-        # Region to string
-        df['region'] = df['region'].astype(str)
-        # Rangos de año
-        years = sorted(df['year'].dropna().unique())
-        if len(years) == 0 or years[0] > 2019 or years[-1] < 2023:
-            msgs.append("Advertencia: se esperaban años 2019–2023 en el panel.")
-    return ok, msgs
+                msgs.append("La columna 'year' debe ser numérica (2019–2023).")
+            
+            # Coerce numeric cols
+            for c in ["nvpov","vpov","pov","epov"]:
+                try:
+                    df[c] = pd.to_numeric(df[c], errors='coerce')
+                except Exception:
+                    ok = False
+                    msgs.append(f"La columna '{c}' debe ser numérica (conteo de personas).")
+            
+            # Region to string
+            df['region'] = df['region'].astype(str)
+            
+            # Rangos de año
+            years = sorted(df['year'].dropna().unique())
+            if len(years) == 0 or years[0] > 2019 or years[-1] < 2023:
+                msgs.append("Advertencia: se esperaban años 2019–2023 en el panel.")
+        
+        return ok, msgs
+    except Exception as e:
+        logging.error(f"Error al validar el DataFrame: {str(e)}")
+        return False, [f"Error al validar el DataFrame: {str(e)}"]
 
 def peru_total(df: pd.DataFrame) -> pd.DataFrame:
+    """Calcula el total nacional para cada año."""
     agg = df.groupby('year', as_index=False)[["nvpov","vpov","pov","epov"]].sum()
     agg.insert(0, 'region', 'Perú (suma nacional)')
     return agg
 
 def fmt_int(x):
+    """Formatea números enteros con separadores de miles."""
     try:
         return f"{int(round(x)):,}".replace(',', '.')
     except Exception:
@@ -118,7 +129,7 @@ def fmt_int(x):
 # Función del scraper mejorada
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
 def obtener_noticias_ipe(url):
-    """Función para obtener noticias de IPE con manejo robusto de errores"""
+    """Función para obtener noticias de IPE con manejo robusto de errores."""
     try:
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
@@ -187,23 +198,4 @@ with PRESENTACION:
           2) **Candidato B – "Ricardo Navarro (Perú Futuro)"**: propone **reducir a la mitad** el número de personas en **pobreza (pov)**.
         - **Fuente** de datos: *Encuesta Nacional de Hogares (ENAHO), INEI*.
 
-        Para comenzar, sube tu Excel en la barra lateral. Una vez validado, podrás navegar el **dashboard** y el **comparador**.
-    """)
-
-# Contenido de la pestaña de dashboard
-with DASHBOARD:
-    st.subheader("Dashboard de pobreza – ENAHO (INEI)")
-    
-    if not uploaded:
-        st.info("Sube un Excel con las columnas requeridas para visualizar el dashboard.")
-    else:
-        try:
-            raw = pd.read_excel(uploaded)
-            df = match_columns(raw)
-            ok, msgs = validate_dataframe(df)
-            if not ok:
-                st.error("No se pudo validar el archivo. Revisa los mensajes y corrige el Excel.")
-                for m in msgs: st.write("• ", m)
-            else:
-                if msgs:
-                    for m in msgs: st.warning
+        Para comenzar, sube tu Excel en la barra lateral. Una vez validado, podrás navegar el **dashboard** y el **comparador**
