@@ -2,8 +2,6 @@ streamlit>=1.38
 pandas>=2.0
 plotly>=5.20
 openpyxl>=3.1
-pip
-install
 selenium
 beautifulsoup4
 lxml
