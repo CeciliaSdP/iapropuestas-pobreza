@@ -63,7 +63,11 @@ def obtener_noticias_ipe(url):
         logging.error(f"Error inesperado: {str(e)}")
         st.error(f"Error inesperado al obtener la noticia: {str(e)}")
         return None
-
+# Agregar antes de usar COMPARADOR
+if 'COMPARADOR' not in locals():
+    logging.error("La variable COMPARADOR no ha sido definida")
+    st.error("Error: La variable COMPARADOR no ha sido definida")
+    raise NameError("La variable COMPARADOR debe ser definida antes de ser utilizada")
 # Modificar la sección de COMPARADOR para incluir el scraper
 with COMPARADOR:
     st.subheader("Comparador de propuestas (ficticias)")
