@@ -11,6 +11,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
+
 st.set_page_config(
     page_title="Comparador ciudadano – Prototipo (ENAHO–INEI)",
     page_icon="📊",
@@ -314,3 +315,67 @@ st.markdown("""
 ---
 <div class='caption'>Este es un prototipo académico. No realiza recomendaciones de voto ni representa a actores reales. Cada cifra debe interpretarse en relación con la cobertura y definiciones de ENAHO–INEI.</div>
 """, unsafe_allow_html=True)
+
+import streamlit as st
+from bs4 import BeautifulSoup
+import requests
+from datetime import datetime
+
+def obtener_noticias_ipe(url):
+    """
+    Función para obtener noticias de IPE
+    """
+    try:
+        # Configurar headers para evitar bloqueos
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        
+        # Realizar la petición HTTP
+        respuesta = requests.get(url, headers=headers, timeout=10)
+        
+        # Verificar si la petición fue exitosa
+        if respuesta.status_code == 200:
+            soup = BeautifulSoup(respuesta.text, 'html.parser')
+            
+            # Extraer título y contenido
+            titulo = soup.find('h1', class_='entry-title').text.strip()
+            contenido = soup.find('div', class_='entry-content').text.strip()
+            
+            return {
+                'titulo': titulo,
+                'contenido': contenido,
+                'fecha': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'url': url
+            }
+        else:
+            st.error(f'Error al obtener la noticia: Código de estado {respuesta.status_code}')
+            return None
+            
+    except Exception as e:
+        st.error(f'Error en el scraping: {str(e)}')
+        return None
+
+# Crear la pestaña de noticias
+st.header('Noticias Relevantes')
+
+urls_noticias = [
+    'https://ipe.org.pe/cajamarca-lidera-en-pobreza-y-desigualdad-salarial-en-el-pais/',
+    'https://ipe.org.pe/la-pobreza-en-el-peru-afecta-a-1-de-cada-4-ciudadanos/'
+]
+
+# Contenedor para las noticias
+with st.container():
+    for url in urls_noticias:
+        noticia = obtener_noticias_ipe(url)
+        if noticia:
+            col1, col2 = st.columns([2, 1])
+            
+            # Mostrar información en columnas
+            with col1:
+                st.subheader(noticia['titulo'])
+                st.write(noticia['contenido'][:500] + '...')
+                
+            with col2:
+                st.write(f'Fecha de extracción: {noticia["fecha"]}')
+                st.markdown(f'[Ver noticia completa]({noticia["url"]})')
